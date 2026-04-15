@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Exam Attendance List</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
+    :root{
+        --bg:#f4f7fb;
+        --card:#ffffff;
+        --text:#1f2937;
+        --muted:#6b7280;
+        --primary:#1d4ed8;
+        --primary-dark:#163ea7;
+        --success:#0f766e;
+        --danger:#b91c1c;
+        --warning:#b45309;
+        --border:#dbe3ef;
+        --shadow:0 10px 30px rgba(15, 23, 42, 0.08);
+        --radius:16px;
+    }
+
+    * {
+        box-sizing: border-box;
+    }
+
+    body {
+        margin: 0;
+        font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+        background: linear-gradient(180deg, #eef4ff 0%, #f8fbff 100%);
+        color: var(--text);
+    }
+
+    .page {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 24px;
+    }
+
+    .hero {
+        background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 55%, #3b82f6 100%);
+        color: #fff;
+        border-radius: 22px;
+        padding: 28px;
+        box-shadow: var(--shadow);
+        margin-bottom: 22px;
+    }
+
+    .hero h1 {
+        margin: 0 0 8px;
+        font-size: 30px;
+        font-weight: 700;
+    }
+
+    .hero p {
+        margin: 0;
+        font-size: 14px;
+        opacity: 0.95;
+    }
+
+    .top-grid {
+        display: grid;
+        grid-template-columns: 1.4fr 1fr;
+        gap: 20px;
+        margin-bottom: 20px;
+    }
+
+    .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: 20px;
+    }
+
+    .card h2 {
+        margin: 0 0 16px;
+        font-size: 18px;
+        color: #0f172a;
+    }
+
+    .upload-grid,
+    .filter-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(220px, 1fr));
+        gap: 16px;
+    }
+
+    .field {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .field label {
+        font-weight: 600;
+        color: #374151;
+        font-size: 13px;
+    }
+
+    .field input[type="text"],
+    .field input[type="file"],
+    .field select {
+        width: 100%;
+        padding: 12px 14px;
+        border: 1px solid #cbd5e1;
+        border-radius: 12px;
+        outline: none;
+        font-size: 14px;
+        background: #fff;
+        transition: 0.2s ease;
+    }
+
+    .field input[type="text"]:focus,
+    .field input[type="file"]:focus,
+    .field select:focus {
+        border-color: #60a5fa;
+        box-shadow: 0 0 0 4px rgba(59,130,246,0.12);
+    }
+
+    .readonly-box {
+        min-height: 46px;
+        padding: 12px 14px;
+        border: 1px dashed #cbd5e1;
+        border-radius: 12px;
+        background: #f8fafc;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        color: #111827;
+        line-height: 1.5;
+        word-break: break-word;
+        white-space: normal;
+    }
+
+    .readonly-box.empty {
+        color: var(--muted);
+    }
+
+    .btn-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 18px;
+    }
+
+    button {
+        border: none;
+        border-radius: 12px;
+        padding: 12px 18px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: 0.2s ease;
+    }
+
+    .btn-primary {
+        background: var(--primary);
+        color: #fff;
+    }
+
+    .btn-primary:hover {
+        background: var(--primary-dark);
+    }
+
+    .btn-secondary {
+        background: #e5eefc;
+        color: #123c91;
+    }
+
+    .btn-secondary:hover {
+        background: #d9e7ff;
+    }
+
+    .btn-dark {
+        background: #0f172a;
+        color: #fff;
+    }
+
+    .btn-dark:hover {
+        background: #020617;
+    }
+
+    .stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+        margin-top: 16px;
+    }
+
+    .stat-box {
+        padding: 16px;
+        border-radius: 14px;
+        border: 1px solid var(--border);
+        background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    }
+
+    .stat-box .label {
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 6px;
+    }
+
+    .stat-box .value {
+        font-size: 24px;
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    .notice {
+        margin-top: 16px;
+        padding: 14px 16px;
+        border-radius: 12px;
+        font-size: 14px;
+        line-height: 1.5;
+        display: none;
+        white-space: pre-line;
+    }
+
+    .notice.success {
+        display: block;
+        background: #ecfdf5;
+        color: #065f46;
+        border: 1px solid #a7f3d0;
+    }
+
+    .notice.error {
+        display: block;
+        background: #fef2f2;
+        color: #991b1b;
+        border: 1px solid #fecaca;
+    }
+
+    .notice.warning {
+        display: block;
+        background: #fff7ed;
+        color: #9a3412;
+        border: 1px solid #fed7aa;
+    }
+
+    .preview-panel {
+        margin-top: 20px;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 6px;
+    }
+
+    th {
+        border: 1px solid #000;
+        padding: 5px 6px;
+        font-size: 12px;
+        background: #f3f4f6;
+    }
+
+    td {
+        border: 1px solid #000;
+        padding: 4px 6px;
+        font-size: 12px;
+    }
+
+    .student-table td {
+        height: 22px;
+        vertical-align: middle;
+    }
+
+    .print-header {
+        text-align: center;
+        margin-bottom: 8px;
+    }
+
+    .print-header img {
+        max-width: 360px;
+    }
+
+    .print-header h1 {
+        margin: 6px 0 8px;
+        font-size: 22px;
+    }
+
+    .course-details,
+    .course-details td {
+        border: none !important;
+        padding: 2px 4px;
+        font-size: 12px;
+        text-align: left;
+        vertical-align: top;
+    }
+
+    .exam-observers {
+        font-weight: bold;
+        margin-top: 10px;
+        page-break-inside: avoid;
+    }
+
+    .screen-only {
+        display: block;
+    }
+
+    @media (max-width: 1100px) {
+        .top-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .upload-grid,
+        .filter-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .stats {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media print {
+        body {
+            background: #fff;
+        }
+
+        .screen-only {
+            display: none !important;
+        }
+
+        .page {
+            max-width: 100%;
+            padding: 0;
+        }
+
+        .card,
+        .hero {
+            box-shadow: none;
+            border: none;
+            padding: 0;
+            margin: 0;
+            background: #fff;
+        }
+
+        .preview-panel {
+            margin-top: 0;
+        }
+    }
+</style>
+</head>
+<body>
+
+<div class="page">
+    <div class="hero screen-only">
+        <h1>Exam Attendance Management</h1>
+        <p>Upload attendance data and exam schedule, then preview or print official attendance sheets by course section.</p>
+    </div>
+
+    <div class="top-grid screen-only">
+        <div class="card">
+            <h2>Data Import</h2>
+            <div class="upload-grid">
+                <div class="field">
+                    <label for="attendanceFileInput">Attendance File</label>
+                    <input type="file" id="attendanceFileInput" accept=".xlsx,.xls,.csv">
+                </div>
+
+                <div class="field">
+                    <label for="examScheduleFileInput">Exam Schedule File</label>
+                    <input type="file" id="examScheduleFileInput" accept=".xlsx,.xls,.csv">
+                </div>
+            </div>
+
+            <div class="stats">
+                <div class="stat-box">
+                    <div class="label">Attendance Rows</div>
+                    <div class="value" id="attendanceRowsCount">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="label">Schedule Rows</div>
+                    <div class="value" id="scheduleRowsCount">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="label">Available Sections</div>
+                    <div class="value" id="availableSectionsCount">0</div>
+                </div>
+            </div>
+
+            <div id="importNotice" class="notice"></div>
+        </div>
+
+        <div class="card">
+            <h2>Course Filters</h2>
+            <div class="filter-grid">
+                <div class="field">
+                    <label for="courseCode">Course Code</label>
+                    <input type="text" id="courseCode" placeholder="Enter Course Code">
+                </div>
+
+                <div class="field">
+                    <label for="sectionSelect">Section</label>
+                    <select id="sectionSelect">
+                        <option value="">Select Section</option>
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label>Exam Date</label>
+                    <div id="examDateDisplay" class="readonly-box empty">Will be filled from exam schedule file</div>
+                </div>
+
+                <div class="field">
+                    <label>Exam Time</label>
+                    <div id="examTimeDisplay" class="readonly-box empty">Will be filled from exam schedule file</div>
+                </div>
+
+                <div class="field" style="grid-column: 1 / -1;">
+                    <label>Exam Room/s</label>
+                    <div id="examRoomsDisplay" class="readonly-box empty">Will be filled from exam schedule file</div>
+                </div>
+            </div>
+
+            <div class="btn-row">
+                <button class="btn-primary" onclick="loadSections()">Load Sections</button>
+                <button class="btn-secondary" onclick="previewSelected()">Search & Preview</button>
+                <button class="btn-secondary" onclick="printPreview()">Print</button>
+                <button class="btn-dark" onclick="printAllSections()">Print All Sections</button>
+            </div>
+
+            <div id="statusMessage" class="notice"></div>
+        </div>
+    </div>
+
+    <div id="output" class="preview-panel"></div>
+</div>
+
+<script>
+let attendanceData = [];
+let examScheduleData = [];
+
+const attendanceFileInput = document.getElementById("attendanceFileInput");
+const examScheduleFileInput = document.getElementById("examScheduleFileInput");
+const courseCodeInput = document.getElementById("courseCode");
+const sectionSelect = document.getElementById("sectionSelect");
+const statusMessage = document.getElementById("statusMessage");
+const importNotice = document.getElementById("importNotice");
+const examDateDisplay = document.getElementById("examDateDisplay");
+const examTimeDisplay = document.getElementById("examTimeDisplay");
+const examRoomsDisplay = document.getElementById("examRoomsDisplay");
+
+attendanceFileInput.addEventListener("change", function(e) {
+    readExcelFile(e.target.files[0], function(data) {
+        attendanceData = data;
+        document.getElementById("attendanceRowsCount").textContent = attendanceData.length;
+        showImportNotice("Attendance file loaded successfully.", "success");
+        resetSectionArea();
+    });
+});
+
+examScheduleFileInput.addEventListener("change", function(e) {
+    readExcelFile(e.target.files[0], function(data) {
+        examScheduleData = data;
+        document.getElementById("scheduleRowsCount").textContent = examScheduleData.length;
+        showImportNotice("Exam schedule file loaded successfully.", "success");
+        resetSectionArea();
+    });
+});
+
+sectionSelect.addEventListener("change", function() {
+    updateExamScheduleDisplay();
+});
+
+function readExcelFile(file, callback) {
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const data = e.target.result;
+        const workbook = XLSX.read(data, {
+            type: "binary",
+            cellDates: true
+        });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(sheet, {
+            defval: "",
+            raw: false
+        });
+        callback(jsonData);
+    };
+    reader.readAsBinaryString(file);
+}
+
+function normalize(value) {
+    return String(value ?? "")
+        .replace(/\u00A0/g, " ")
+        .trim()
+        .toLowerCase();
+}
+
+function normalizeKey(value) {
+    return String(value ?? "")
+        .replace(/\u00A0/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .toLowerCase();
+}
+
+function normalizeSection(value) {
+    const text = String(value ?? "").trim();
+    if (text === "") return "";
+    const num = Number(text);
+    if (!Number.isNaN(num)) return String(num);
+    return text.toLowerCase();
+}
+
+function getValueCaseInsensitive(row, possibleKeys) {
+    const rowKeys = Object.keys(row || {});
+    for (const wantedKey of possibleKeys) {
+        const found = rowKeys.find(k => normalizeKey(k) === normalizeKey(wantedKey));
+        if (found !== undefined) return row[found];
+    }
+    return "";
+}
+
+function getAttendanceCourseCode(row) {
+    return getValueCaseInsensitive(row, ["Coursecode", "Course Code"]);
+}
+
+function getAttendanceSection(row) {
+    return getValueCaseInsensitive(row, ["Section"]);
+}
+
+function getAttendanceFullname(row) {
+    return getValueCaseInsensitive(row, ["Fullname", "Full Name"]);
+}
+
+function getAttendanceSemester(row) {
+    return getValueCaseInsensitive(row, ["Semester"]);
+}
+
+function getAttendanceRole(row) {
+    return getValueCaseInsensitive(row, ["Role"]);
+}
+
+function getAttendanceName(row) {
+    return getValueCaseInsensitive(row, ["Name"]);
+}
+
+function getAttendanceStatus(row) {
+    return getValueCaseInsensitive(row, ["Status"]);
+}
+
+function getAttendanceStudentNumber(row) {
+    return getValueCaseInsensitive(row, ["Student Number", "Student_Number"]);
+}
+
+function getScheduleCourseCode(row) {
+    return getValueCaseInsensitive(row, ["Coursecode", "Course Code"]);
+}
+
+function getScheduleSection(row) {
+    return getValueCaseInsensitive(row, ["Section"]);
+}
+
+function getScheduleExamDate(row) {
+    return getValueCaseInsensitive(row, ["Exam Date"]);
+}
+
+function getScheduleExamTimeFrom(row) {
+    return getValueCaseInsensitive(row, ["Exam Time From"]);
+}
+
+function getScheduleExamTimeTo(row) {
+    return getValueCaseInsensitive(row, ["Exam Time To"]);
+}
+
+function getScheduleExamRooms(row) {
+    return getValueCaseInsensitive(row, [
+        "Exam Room/s",
+        "Exam Rooms",
+        "Exam Room",
+        "Exam Room /s",
+        "Exam room/s"
+    ]);
+}
+
+function formatExamDate(value) {
+    if (!value) return "";
+
+    const text = String(value).trim();
+    const tryDate = new Date(text);
+
+    if (!isNaN(tryDate.getTime())) {
+        return tryDate.toLocaleDateString("en-US", {
+            weekday: "long",
+            year: "numeric",
+            month: "long",
+            day: "numeric"
+        });
+    }
+
+    return text;
+}
+
+function formatExamTime(value) {
+    if (!value) return "";
+
+    const text = String(value).trim();
+
+    const directTime = new Date(`1970-01-01T${text}`);
+    if (!isNaN(directTime.getTime())) {
+        return directTime.toLocaleTimeString("en-US", {
+            hour: "numeric",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: true
+        });
+    }
+
+    const match = text.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i);
+    if (match) {
+        let hours = parseInt(match[1], 10);
+        const minutes = parseInt(match[2], 10);
+        const seconds = parseInt(match[3] || "0", 10);
+        const ampm = match[4];
+
+        if (ampm) {
+            const meridian = ampm.toUpperCase();
+            if (meridian === "PM" && hours < 12) hours += 12;
+            if (meridian === "AM" && hours === 12) hours = 0;
+        }
+
+        const tempDate = new Date();
+        tempDate.setHours(hours, minutes, seconds, 0);
+
+        return tempDate.toLocaleTimeString("en-US", {
+            hour: "numeric",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: true
+        });
+    }
+
+    return text;
+}
+
+function formatExamRooms(value) {
+    if (value === null || value === undefined) return "";
+
+    let text = String(value)
+        .replace(/^"+|"+$/g, "")
+        .replace(/\r/g, "\n")
+        .trim();
+
+    if (!text) return "";
+
+    const rooms = text
+        .split(/\n|,/)
+        .map(v => v.trim())
+        .filter(Boolean);
+
+    return rooms.join("، ");
+}
+
+function resetSectionArea() {
+    sectionSelect.innerHTML = '<option value="">Select Section</option>';
+
+    examDateDisplay.textContent = "Will be filled from exam schedule file";
+    examDateDisplay.className = "readonly-box empty";
+
+    examTimeDisplay.textContent = "Will be filled from exam schedule file";
+    examTimeDisplay.className = "readonly-box empty";
+
+    examRoomsDisplay.textContent = "Will be filled from exam schedule file";
+    examRoomsDisplay.className = "readonly-box empty";
+
+    document.getElementById("availableSectionsCount").textContent = "0";
+    clearStatus();
+}
+
+function showImportNotice(message, type) {
+    importNotice.className = `notice ${type}`;
+    importNotice.textContent = message;
+}
+
+function showStatus(message, type = "warning") {
+    statusMessage.className = `notice ${type}`;
+    statusMessage.textContent = message;
+}
+
+function clearStatus() {
+    statusMessage.className = "notice";
+    statusMessage.textContent = "";
+}
+
+function getScheduleRecord(courseCode, section) {
+    return examScheduleData.find(r =>
+        normalize(getScheduleCourseCode(r)) === normalize(courseCode) &&
+        normalizeSection(getScheduleSection(r)) === normalizeSection(section)
+    );
+}
+
+function getAvailableScheduledSectionsForCourse(courseCode) {
+    const attendanceSections = [...new Set(
+        attendanceData
+            .filter(r => normalize(getAttendanceCourseCode(r)) === normalize(courseCode))
+            .map(r => getAttendanceSection(r))
+            .filter(v => String(v).trim() !== "")
+    )];
+
+    const scheduleSections = new Set(
+        examScheduleData
+            .filter(r => normalize(getScheduleCourseCode(r)) === normalize(courseCode))
+            .map(r => normalizeSection(getScheduleSection(r)))
+            .filter(Boolean)
+    );
+
+    return attendanceSections.filter(section => scheduleSections.has(normalizeSection(section)));
+}
+
+function getMissingScheduledSectionsForCourse(courseCode) {
+    const attendanceSections = [...new Set(
+        attendanceData
+            .filter(r => normalize(getAttendanceCourseCode(r)) === normalize(courseCode))
+            .map(r => getAttendanceSection(r))
+            .filter(v => String(v).trim() !== "")
+    )];
+
+    return attendanceSections.filter(section => !getScheduleRecord(courseCode, section));
+}
+
+function loadSections() {
+    clearStatus();
+    sectionSelect.innerHTML = '<option value="">Select Section</option>';
+    document.getElementById("output").innerHTML = "";
+
+    examDateDisplay.textContent = "Will be filled from exam schedule file";
+    examDateDisplay.className = "readonly-box empty";
+
+    examTimeDisplay.textContent = "Will be filled from exam schedule file";
+    examTimeDisplay.className = "readonly-box empty";
+
+    examRoomsDisplay.textContent = "Will be filled from exam schedule file";
+    examRoomsDisplay.className = "readonly-box empty";
+
+    const courseCode = courseCodeInput.value.trim();
+
+    if (!attendanceData.length) {
+        showStatus("Please upload the attendance file first.", "error");
+        return;
+    }
+
+    if (!examScheduleData.length) {
+        showStatus("Please upload the exam schedule file first.", "error");
+        return;
+    }
+
+    if (!courseCode) {
+        showStatus("Please enter a course code.", "error");
+        return;
+    }
+
+    const allCourseRows = attendanceData.filter(r =>
+        normalize(getAttendanceCourseCode(r)) === normalize(courseCode)
+    );
+
+    if (!allCourseRows.length) {
+        showStatus("No attendance data found for this course code.", "error");
+        document.getElementById("availableSectionsCount").textContent = "0";
+        return;
+    }
+
+    const availableSections = getAvailableScheduledSectionsForCourse(courseCode);
+    const missingSections = getMissingScheduledSectionsForCourse(courseCode);
+
+    availableSections.forEach(section => {
+        const opt = document.createElement("option");
+        opt.value = section;
+        opt.textContent = section;
+        sectionSelect.appendChild(opt);
+    });
+
+    document.getElementById("availableSectionsCount").textContent = availableSections.length;
+
+    if (!availableSections.length) {
+        showStatus("This course does not have any sections with exam schedule.", "error");
+        return;
+    }
+
+    if (missingSections.length) {
+        showStatus(
+            "Some sections were not shown because they do not have exam schedule:\n" +
+            missingSections.join(", "),
+            "warning"
+        );
+    } else {
+        showStatus("Sections loaded successfully.", "success");
+    }
+}
+
+function updateExamScheduleDisplay() {
+    const courseCode = courseCodeInput.value.trim();
+    const section = sectionSelect.value;
+
+    if (!courseCode || !section) {
+        examDateDisplay.textContent = "Will be filled from exam schedule file";
+        examDateDisplay.className = "readonly-box empty";
+
+        examTimeDisplay.textContent = "Will be filled from exam schedule file";
+        examTimeDisplay.className = "readonly-box empty";
+
+        examRoomsDisplay.textContent = "Will be filled from exam schedule file";
+        examRoomsDisplay.className = "readonly-box empty";
+        return;
+    }
+
+    const schedule = getScheduleRecord(courseCode, section);
+
+    if (!schedule) {
+        examDateDisplay.textContent = "No exam schedule found";
+        examDateDisplay.className = "readonly-box";
+
+        examTimeDisplay.textContent = "No exam schedule found";
+        examTimeDisplay.className = "readonly-box";
+
+        examRoomsDisplay.textContent = "No exam schedule found";
+        examRoomsDisplay.className = "readonly-box";
+
+        showStatus("This course section does not have exam schedule.", "warning");
+        return;
+    }
+
+    const examDate = formatExamDate(getScheduleExamDate(schedule));
+    const examFrom = formatExamTime(getScheduleExamTimeFrom(schedule));
+    const examTo = formatExamTime(getScheduleExamTimeTo(schedule));
+    const examRooms = formatExamRooms(getScheduleExamRooms(schedule));
+
+    examDateDisplay.textContent = examDate || "No exam date";
+    examDateDisplay.className = "readonly-box";
+
+    examTimeDisplay.textContent = `${examFrom}${examFrom && examTo ? " To " : ""}${examTo}` || "No exam time";
+    examTimeDisplay.className = "readonly-box";
+
+    examRoomsDisplay.textContent = examRooms || "No exam room";
+    examRoomsDisplay.className = "readonly-box";
+}
+
+function previewSelected() {
+    clearStatus();
+
+    const courseCode = courseCodeInput.value.trim();
+    const section = sectionSelect.value;
+
+    if (!courseCode || !section) {
+        showStatus("Please enter course code and select section.", "error");
+        return;
+    }
+
+    const filtered = attendanceData.filter(r =>
+        normalize(getAttendanceCourseCode(r)) === normalize(courseCode) &&
+        normalizeSection(getAttendanceSection(r)) === normalizeSection(section)
+    );
+
+    if (!filtered.length) {
+        showStatus("No attendance data found for the selected course section.", "error");
+        return;
+    }
+
+    const schedule = getScheduleRecord(courseCode, section);
+    if (!schedule) {
+        showStatus("This course section does not have exam schedule.", "warning");
+        document.getElementById("output").innerHTML = "";
+        return;
+    }
+
+    updateExamScheduleDisplay();
+
+    const instructor = filtered.find(r => normalize(getAttendanceRole(r)) === "t");
+    const students = filtered.filter(r => normalize(getAttendanceRole(r)) !== "t");
+
+    document.getElementById("output").innerHTML =
+        generateAttendanceHTML(
+            courseCode,
+            getAttendanceFullname(filtered[0]),
+            getAttendanceSemester(filtered[0]),
+            section,
+            instructor,
+            students,
+            schedule
+        );
+}
+
+function printPreview() {
+    const output = document.getElementById("output").innerHTML.trim();
+    if (!output) {
+        showStatus("Please preview a section first before printing.", "warning");
+        return;
+    }
+    window.print();
+}
+
+function printAllSections() {
+    clearStatus();
+
+    const courseCode = courseCodeInput.value.trim();
+
+    if (!courseCode) {
+        showStatus("Please enter a course code.", "error");
+        return;
+    }
+
+    if (!attendanceData.length) {
+        showStatus("Please upload the attendance file first.", "error");
+        return;
+    }
+
+    if (!examScheduleData.length) {
+        showStatus("Please upload the exam schedule file first.", "error");
+        return;
+    }
+
+    const sectionsToPrint = getAvailableScheduledSectionsForCourse(courseCode);
+    const missingSections = getMissingScheduledSectionsForCourse(courseCode);
+
+    if (!sectionsToPrint.length) {
+        showStatus("No sections available to print because no exam schedule was found.", "error");
+        document.getElementById("output").innerHTML = "";
+        return;
+    }
+
+    let html = "";
+
+    sectionsToPrint.forEach((section, index) => {
+        const filtered = attendanceData.filter(r =>
+            normalize(getAttendanceCourseCode(r)) === normalize(courseCode) &&
+            normalizeSection(getAttendanceSection(r)) === normalizeSection(section)
+        );
+
+        const instructor = filtered.find(r => normalize(getAttendanceRole(r)) === "t");
+        const students = filtered.filter(r => normalize(getAttendanceRole(r)) !== "t");
+        const schedule = getScheduleRecord(courseCode, section);
+
+        html += generateAttendanceHTML(
+            courseCode,
+            getAttendanceFullname(filtered[0]),
+            getAttendanceSemester(filtered[0]),
+            section,
+            instructor,
+            students,
+            schedule
+        );
+
+        if (index < sectionsToPrint.length - 1) {
+            html += `<div style="page-break-after: always;"></div>`;
+        }
+    });
+
+    document.getElementById("output").innerHTML = html;
+
+    if (missingSections.length) {
+        showStatus(
+            "Printed only sections that have exam schedule.\nMissing sections: " + missingSections.join(", "),
+            "warning"
+        );
+    } else {
+        showStatus("All scheduled sections are ready for printing.", "success");
+    }
+
+    window.print();
+}
+
+function generateAttendanceHTML(code, name, semester, section, instructor, students, schedule) {
+    const examDate = formatExamDate(getScheduleExamDate(schedule));
+    const examTimeFrom = formatExamTime(getScheduleExamTimeFrom(schedule));
+    const examTimeTo = formatExamTime(getScheduleExamTimeTo(schedule));
+    const examRooms = formatExamRooms(getScheduleExamRooms(schedule));
+    const examDateTime = `${examDate} / ${examTimeFrom}${examTimeFrom && examTimeTo ? " To " : ""}${examTimeTo}`;
+
+    let html = "";
+    const maxRowsPerPage = 25;
+    const extraRows = 2;
+    const pageCount = Math.max(1, Math.ceil(students.length / maxRowsPerPage));
+
+    for (let p = 0; p < pageCount; p++) {
+        const start = p * maxRowsPerPage;
+        const end = start + maxRowsPerPage;
+        const pageStudents = students.slice(start, end);
+
+        html += `
+        <div class="print-header">
+            <img src="https://ocmt.odoo.com/web/image/14023-206f05ff/ltuc_logo_en_colored.webp" alt="LTUC Logo">
+            <h1>Exam Attendance List</h1>
+
+            <table class="course-details">
+                <tr>
+                    <td><strong>Course Code:</strong> ${code || ""}</td>
+                    <td><strong>Course Name:</strong> ${name || ""}</td>
+                </tr>
+                <tr>
+                    <td><strong>Section:</strong> ${section || ""}</td>
+                    <td><strong>Instructor:</strong> ${instructor ? (getAttendanceName(instructor) || "") : ""}</td>
+                </tr>
+                <tr>
+                    <td><strong>Semester:</strong> ${semester || ""}</td>
+                    <td><strong>Exam Time and Date:</strong> ${examDateTime || ""}</td>
+                </tr>
+                <tr>
+                    <td colspan="2"><strong>Exam Room/s:</strong> ${examRooms || ""}</td>
+                </tr>
+            </table>
+        </div>
+
+        <table class="student-table">
+            <tr>
+                <th>#</th>
+                <th>Student Number</th>
+                <th>Name</th>
+                <th>Status</th>
+                <th>Signature</th>
+            </tr>
+        `;
+
+        pageStudents.forEach((student, i) => {
+            const status = getAttendanceStatus(student);
+            const isDisqualified = normalize(status) === normalize("Dismissed due to absence");
+
+            html += `
+            <tr ${isDisqualified ? 'style="background:#d3d3d3;font-weight:bold;"' : ''}>
+                <td>${start + i + 1}</td>
+                <td>${getAttendanceStudentNumber(student) || ""}</td>
+                <td>${getAttendanceName(student) || ""}</td>
+                <td>${status || ""}</td>
+                <td></td>
+            </tr>
+            `;
+        });
+
+        if (p === pageCount - 1) {
+            for (let j = 0; j < extraRows; j++) {
+                html += `<tr><td>${students.length + j + 1}</td><td></td><td></td><td></td><td></td></tr>`;
+            }
+        }
+
+        html += `</table>`;
+
+        if (p === pageCount - 1) {
+            html += `
+            <div class="exam-observers">
+                <div>Exam Observers</div>
+                <table>
+                    <tr><th>#</th><th>Name</th><th>Signature</th></tr>
+                    <tr><td>1</td><td style="height:22px;"></td><td></td></tr>
+                    <tr><td>2</td><td style="height:22px;"></td><td></td></tr>
+                    <tr><td>3</td><td style="height:22px;"></td><td></td></tr>
+                </table>
+            </div>
+            `;
+        }
+
+        if (p < pageCount - 1) {
+            html += `<div style="page-break-after: always;"></div>`;
+        }
+    }
+
+    return html;
+}
+</script>
+
+</body>
+</html>
