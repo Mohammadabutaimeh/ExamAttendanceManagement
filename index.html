@@ -351,7 +351,7 @@
 <div class="page">
     <div class="hero screen-only">
         <h1>Exam Attendance Management</h1>
-        <p>Upload attendance data and exam schedule, then preview or print official attendance sheets by course section.</p>
+        <p>Upload attendance data and exam schedule, then preview or print official attendance sheets by course section or room.</p>
     </div>
 
     <div class="top-grid screen-only">
@@ -396,9 +396,23 @@
                 </div>
 
                 <div class="field">
+                    <label for="roomSearch">Search by Room</label>
+                    <select id="roomSearch">
+                        <option value="">Select Exam Room</option>
+                    </select>
+                </div>
+
+                <div class="field">
                     <label for="sectionSelect">Section</label>
                     <select id="sectionSelect">
                         <option value="">Select Section</option>
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label for="roomResultSelect">Room Results</label>
+                    <select id="roomResultSelect">
+                        <option value="">Select Course / Section from room</option>
                     </select>
                 </div>
 
@@ -420,9 +434,12 @@
 
             <div class="btn-row">
                 <button class="btn-primary" onclick="loadSections()">Load Sections</button>
+                <button class="btn-secondary" onclick="searchByRoom()">Search By Room</button>
                 <button class="btn-secondary" onclick="previewSelected()">Search & Preview</button>
+                <button class="btn-secondary" onclick="previewSelectedRoom()">Preview Room Selection</button>
                 <button class="btn-secondary" onclick="printPreview()">Print</button>
                 <button class="btn-dark" onclick="printAllSections()">Print All Sections</button>
+                <button class="btn-dark" onclick="printAllByRoom()">Print All In Room</button>
             </div>
 
             <div id="statusMessage" class="notice"></div>
@@ -439,7 +456,9 @@ let examScheduleData = [];
 const attendanceFileInput = document.getElementById("attendanceFileInput");
 const examScheduleFileInput = document.getElementById("examScheduleFileInput");
 const courseCodeInput = document.getElementById("courseCode");
+const roomSearchSelect = document.getElementById("roomSearch");
 const sectionSelect = document.getElementById("sectionSelect");
+const roomResultSelect = document.getElementById("roomResultSelect");
 const statusMessage = document.getElementById("statusMessage");
 const importNotice = document.getElementById("importNotice");
 const examDateDisplay = document.getElementById("examDateDisplay");
@@ -459,12 +478,28 @@ examScheduleFileInput.addEventListener("change", function(e) {
     readExcelFile(e.target.files[0], function(data) {
         examScheduleData = data;
         document.getElementById("scheduleRowsCount").textContent = examScheduleData.length;
+        populateRoomDropdown();
         showImportNotice("Exam schedule file loaded successfully.", "success");
-        resetSectionArea();
+        resetSectionArea(false);
     });
 });
 
 sectionSelect.addEventListener("change", function() {
+    roomResultSelect.value = "";
+    updateExamScheduleDisplay();
+});
+
+roomResultSelect.addEventListener("change", function() {
+    if (!roomResultSelect.value) return;
+
+    if (roomResultSelect.value === "__ALL__") {
+        clearExamScheduleDisplay();
+        return;
+    }
+
+    const selected = JSON.parse(roomResultSelect.value);
+    courseCodeInput.value = selected.courseCode;
+    loadSectionsFromRoomSelection(selected.courseCode, selected.section);
     updateExamScheduleDisplay();
 });
 
@@ -582,6 +617,37 @@ function getScheduleExamRooms(row) {
     ]);
 }
 
+function getScheduleMainObserver(row) {
+    return getValueCaseInsensitive(row, ["Main Observer"]);
+}
+
+function getScheduleAssistantObserver1(row) {
+    return getValueCaseInsensitive(row, ["Assistant Observer 1"]);
+}
+
+function getScheduleAssistantObserver2(row) {
+    return getValueCaseInsensitive(row, ["Assistant Observer 2"]);
+}
+
+function getExamObservers(schedule) {
+    const observers = [
+        {
+            name: getScheduleMainObserver(schedule),
+            role: "Main Observer"
+        },
+        {
+            name: getScheduleAssistantObserver1(schedule),
+            role: "Assistant Observer 1"
+        },
+        {
+            name: getScheduleAssistantObserver2(schedule),
+            role: "Assistant Observer 2"
+        }
+    ];
+
+    return observers.filter(observer => String(observer.name || "").trim() !== "");
+}
+
 function formatExamDate(value) {
     if (!value) return "";
 
@@ -604,8 +670,8 @@ function formatExamTime(value) {
     if (!value) return "";
 
     const text = String(value).trim();
-
     const directTime = new Date(`1970-01-01T${text}`);
+
     if (!isNaN(directTime.getTime())) {
         return directTime.toLocaleTimeString("en-US", {
             hour: "numeric",
@@ -642,27 +708,55 @@ function formatExamTime(value) {
     return text;
 }
 
-function formatExamRooms(value) {
-    if (value === null || value === undefined) return "";
+function parseRooms(value) {
+    if (value === null || value === undefined) return [];
 
     let text = String(value)
         .replace(/^"+|"+$/g, "")
         .replace(/\r/g, "\n")
         .trim();
 
-    if (!text) return "";
+    if (!text) return [];
 
-    const rooms = text
+    return text
         .split(/\n|,/)
         .map(v => v.trim())
         .filter(Boolean);
+}
 
+function formatExamRooms(value) {
+    const rooms = parseRooms(value);
     return rooms.join("، ");
 }
 
-function resetSectionArea() {
-    sectionSelect.innerHTML = '<option value="">Select Section</option>';
+function populateRoomDropdown() {
+    const uniqueRooms = new Set();
 
+    examScheduleData.forEach(row => {
+        const roomValue = formatExamRooms(getScheduleExamRooms(row));
+        if (roomValue) uniqueRooms.add(roomValue);
+    });
+
+    const sortedRooms = Array.from(uniqueRooms).sort((a, b) =>
+        a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
+    );
+
+    roomSearchSelect.innerHTML = '<option value="">Select Exam Room</option>';
+
+    sortedRooms.forEach(room => {
+        const option = document.createElement("option");
+        option.value = room;
+        option.textContent = room;
+        roomSearchSelect.appendChild(option);
+    });
+}
+
+function roomMatches(scheduleRow, targetRoom) {
+    const roomValue = formatExamRooms(getScheduleExamRooms(scheduleRow));
+    return normalize(roomValue) === normalize(targetRoom);
+}
+
+function clearExamScheduleDisplay() {
     examDateDisplay.textContent = "Will be filled from exam schedule file";
     examDateDisplay.className = "readonly-box empty";
 
@@ -671,9 +765,21 @@ function resetSectionArea() {
 
     examRoomsDisplay.textContent = "Will be filled from exam schedule file";
     examRoomsDisplay.className = "readonly-box empty";
+}
+
+function resetSectionArea(resetRooms = true) {
+    sectionSelect.innerHTML = '<option value="">Select Section</option>';
+    roomResultSelect.innerHTML = '<option value="">Select Course / Section from room</option>';
+
+    if (resetRooms) {
+        roomSearchSelect.innerHTML = '<option value="">Select Exam Room</option>';
+    }
+
+    clearExamScheduleDisplay();
 
     document.getElementById("availableSectionsCount").textContent = "0";
     clearStatus();
+    document.getElementById("output").innerHTML = "";
 }
 
 function showImportNotice(message, type) {
@@ -729,17 +835,11 @@ function getMissingScheduledSectionsForCourse(courseCode) {
 
 function loadSections() {
     clearStatus();
+    roomResultSelect.innerHTML = '<option value="">Select Course / Section from room</option>';
     sectionSelect.innerHTML = '<option value="">Select Section</option>';
     document.getElementById("output").innerHTML = "";
 
-    examDateDisplay.textContent = "Will be filled from exam schedule file";
-    examDateDisplay.className = "readonly-box empty";
-
-    examTimeDisplay.textContent = "Will be filled from exam schedule file";
-    examTimeDisplay.className = "readonly-box empty";
-
-    examRoomsDisplay.textContent = "Will be filled from exam schedule file";
-    examRoomsDisplay.className = "readonly-box empty";
+    clearExamScheduleDisplay();
 
     const courseCode = courseCodeInput.value.trim();
 
@@ -796,19 +896,116 @@ function loadSections() {
     }
 }
 
+function loadSectionsFromRoomSelection(courseCode, selectedSection) {
+    sectionSelect.innerHTML = '<option value="">Select Section</option>';
+
+    const availableSections = getAvailableScheduledSectionsForCourse(courseCode);
+
+    availableSections.forEach(section => {
+        const opt = document.createElement("option");
+        opt.value = section;
+        opt.textContent = section;
+        sectionSelect.appendChild(opt);
+    });
+
+    sectionSelect.value = selectedSection;
+    document.getElementById("availableSectionsCount").textContent = availableSections.length;
+}
+
+function getRoomSearchResults() {
+    const room = roomSearchSelect.value;
+    const courseCode = courseCodeInput.value.trim();
+
+    let results = examScheduleData.filter(row => roomMatches(row, room));
+
+    if (courseCode) {
+        results = results.filter(row => normalize(getScheduleCourseCode(row)) === normalize(courseCode));
+    }
+
+    results = results.filter(row => {
+        const scheduleCourseCode = getScheduleCourseCode(row);
+        const scheduleSection = getScheduleSection(row);
+
+        return attendanceData.some(att =>
+            normalize(getAttendanceCourseCode(att)) === normalize(scheduleCourseCode) &&
+            normalizeSection(getAttendanceSection(att)) === normalizeSection(scheduleSection)
+        );
+    });
+
+    results.sort((a, b) => {
+        const courseCompare = String(getScheduleCourseCode(a)).localeCompare(String(getScheduleCourseCode(b)), undefined, { numeric: true, sensitivity: "base" });
+        if (courseCompare !== 0) return courseCompare;
+
+        return String(getScheduleSection(a)).localeCompare(String(getScheduleSection(b)), undefined, { numeric: true, sensitivity: "base" });
+    });
+
+    return results;
+}
+
+function searchByRoom() {
+    clearStatus();
+    roomResultSelect.innerHTML = '<option value="">Select Course / Section from room</option>';
+    sectionSelect.innerHTML = '<option value="">Select Section</option>';
+    document.getElementById("output").innerHTML = "";
+
+    clearExamScheduleDisplay();
+
+    const room = roomSearchSelect.value;
+
+    if (!attendanceData.length) {
+        showStatus("Please upload the attendance file first.", "error");
+        return;
+    }
+
+    if (!examScheduleData.length) {
+        showStatus("Please upload the exam schedule file first.", "error");
+        return;
+    }
+
+    if (!room) {
+        showStatus("Please select an exam room.", "error");
+        return;
+    }
+
+    const results = getRoomSearchResults();
+
+    if (!results.length) {
+        document.getElementById("availableSectionsCount").textContent = "0";
+        showStatus("No exam schedule records found for this room.", "error");
+        return;
+    }
+
+    const allOption = document.createElement("option");
+    allOption.value = "__ALL__";
+    allOption.textContent = `All (${results.length} results)`;
+    roomResultSelect.appendChild(allOption);
+
+    results.forEach(row => {
+        const courseCodeVal = getScheduleCourseCode(row);
+        const sectionVal = getScheduleSection(row);
+        const courseNameVal = getValueCaseInsensitive(row, ["Fullname", "Full Name"]);
+        const roomsVal = formatExamRooms(getScheduleExamRooms(row));
+
+        const opt = document.createElement("option");
+        opt.value = JSON.stringify({
+            courseCode: courseCodeVal,
+            section: sectionVal
+        });
+        opt.textContent = `${courseCodeVal} - Section ${sectionVal}${courseNameVal ? " - " + courseNameVal : ""}${roomsVal ? " - Room: " + roomsVal : ""}`;
+        roomResultSelect.appendChild(opt);
+    });
+
+    roomResultSelect.value = "__ALL__";
+    document.getElementById("availableSectionsCount").textContent = results.length;
+    showStatus("Room search completed successfully.", "success");
+}
+
 function updateExamScheduleDisplay() {
     const courseCode = courseCodeInput.value.trim();
     const section = sectionSelect.value;
 
     if (!courseCode || !section) {
-        examDateDisplay.textContent = "Will be filled from exam schedule file";
-        examDateDisplay.className = "readonly-box empty";
-
-        examTimeDisplay.textContent = "Will be filled from exam schedule file";
-        examTimeDisplay.className = "readonly-box empty";
-
-        examRoomsDisplay.textContent = "Will be filled from exam schedule file";
-        examRoomsDisplay.className = "readonly-box empty";
+        clearExamScheduleDisplay();
         return;
     }
 
@@ -886,6 +1083,71 @@ function previewSelected() {
             students,
             schedule
         );
+}
+
+function previewSelectedRoom() {
+    clearStatus();
+
+    if (!roomResultSelect.value) {
+        showStatus("Please select a room result first.", "error");
+        return;
+    }
+
+    if (roomResultSelect.value === "__ALL__") {
+        previewAllRoomResults();
+        return;
+    }
+
+    const selected = JSON.parse(roomResultSelect.value);
+    courseCodeInput.value = selected.courseCode;
+    loadSectionsFromRoomSelection(selected.courseCode, selected.section);
+    updateExamScheduleDisplay();
+    previewSelected();
+}
+
+function previewAllRoomResults() {
+    const results = getRoomSearchResults();
+
+    if (!results.length) {
+        showStatus("No room results available for preview.", "error");
+        document.getElementById("output").innerHTML = "";
+        return;
+    }
+
+    let html = "";
+
+    results.forEach((schedule, index) => {
+        const courseCodeVal = getScheduleCourseCode(schedule);
+        const sectionVal = getScheduleSection(schedule);
+
+        const filtered = attendanceData.filter(r =>
+            normalize(getAttendanceCourseCode(r)) === normalize(courseCodeVal) &&
+            normalizeSection(getAttendanceSection(r)) === normalizeSection(sectionVal)
+        );
+
+        if (!filtered.length) return;
+
+        const instructor = filtered.find(r => normalize(getAttendanceRole(r)) === "t");
+        const students = filtered.filter(r => normalize(getAttendanceRole(r)) !== "t");
+
+        html += generateAttendanceHTML(
+            courseCodeVal,
+            getAttendanceFullname(filtered[0]),
+            getAttendanceSemester(filtered[0]),
+            sectionVal,
+            instructor,
+            students,
+            schedule
+        );
+
+        if (index < results.length - 1) {
+            html += `<div style="page-break-after: always;"></div>`;
+        }
+    });
+
+    document.getElementById("output").innerHTML = html;
+    clearExamScheduleDisplay();
+    showStatus("All room results are ready for preview.", "success");
 }
 
 function printPreview() {
@@ -967,12 +1229,77 @@ function printAllSections() {
     window.print();
 }
 
+function printAllByRoom() {
+    clearStatus();
+
+    const room = roomSearchSelect.value;
+
+    if (!room) {
+        showStatus("Please select an exam room.", "error");
+        return;
+    }
+
+    if (!attendanceData.length) {
+        showStatus("Please upload the attendance file first.", "error");
+        return;
+    }
+
+    if (!examScheduleData.length) {
+        showStatus("Please upload the exam schedule file first.", "error");
+        return;
+    }
+
+    const results = getRoomSearchResults();
+
+    if (!results.length) {
+        showStatus("No printable records found for this room.", "error");
+        document.getElementById("output").innerHTML = "";
+        return;
+    }
+
+    let html = "";
+
+    results.forEach((schedule, index) => {
+        const courseCodeVal = getScheduleCourseCode(schedule);
+        const sectionVal = getScheduleSection(schedule);
+
+        const filtered = attendanceData.filter(r =>
+            normalize(getAttendanceCourseCode(r)) === normalize(courseCodeVal) &&
+            normalizeSection(getAttendanceSection(r)) === normalizeSection(sectionVal)
+        );
+
+        if (!filtered.length) return;
+
+        const instructor = filtered.find(r => normalize(getAttendanceRole(r)) === "t");
+        const students = filtered.filter(r => normalize(getAttendanceRole(r)) !== "t");
+
+        html += generateAttendanceHTML(
+            courseCodeVal,
+            getAttendanceFullname(filtered[0]),
+            getAttendanceSemester(filtered[0]),
+            sectionVal,
+            instructor,
+            students,
+            schedule
+        );
+
+        if (index < results.length - 1) {
+            html += `<div style="page-break-after: always;"></div>`;
+        }
+    });
+
+    document.getElementById("output").innerHTML = html;
+    showStatus("All exam attendance lists for the selected room are ready for printing.", "success");
+    window.print();
+}
+
 function generateAttendanceHTML(code, name, semester, section, instructor, students, schedule) {
     const examDate = formatExamDate(getScheduleExamDate(schedule));
     const examTimeFrom = formatExamTime(getScheduleExamTimeFrom(schedule));
     const examTimeTo = formatExamTime(getScheduleExamTimeTo(schedule));
     const examRooms = formatExamRooms(getScheduleExamRooms(schedule));
     const examDateTime = `${examDate} / ${examTimeFrom}${examTimeFrom && examTimeTo ? " To " : ""}${examTimeTo}`;
+    const observers = getExamObservers(schedule);
 
     let html = "";
     const maxRowsPerPage = 25;
@@ -1046,10 +1373,34 @@ function generateAttendanceHTML(code, name, semester, section, instructor, stude
             <div class="exam-observers">
                 <div>Exam Observers</div>
                 <table>
-                    <tr><th>#</th><th>Name</th><th>Signature</th></tr>
-                    <tr><td>1</td><td style="height:22px;"></td><td></td></tr>
-                    <tr><td>2</td><td style="height:22px;"></td><td></td></tr>
-                    <tr><td>3</td><td style="height:22px;"></td><td></td></tr>
+                    <tr>
+                        <th>#</th>
+                        <th>Name</th>
+                        <th>Observation Role</th>
+                        <th>Signature</th>
+                    </tr>
+            `;
+
+            if (observers.length) {
+                observers.forEach((observer, index) => {
+                    html += `
+                        <tr>
+                            <td>${index + 1}</td>
+                            <td style="height:40px;">${observer.name || ""}</td>
+                            <td>${observer.role || ""}</td>
+                            <td></td>
+                        </tr>
+                    `;
+                });
+            } else {
+                html += `
+                    <tr><td>1</td><td style="height:22px;"></td><td></td><td></td></tr>
+                    <tr><td>2</td><td style="height:22px;"></td><td></td><td></td></tr>
+                    <tr><td>3</td><td style="height:22px;"></td><td></td><td></td></tr>
+                `;
+            }
+
+            html += `
                 </table>
             </div>
             `;
